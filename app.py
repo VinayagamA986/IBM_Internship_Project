@@ -1,12 +1,10 @@
-# app.py
+# REQUIRED LIBRARIES
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from transformers import pipeline
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from pathlib import Path
-from PIL import Image
 import io
 
 # --- CONFIG ---
@@ -16,18 +14,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- LOAD AI MODEL ---
-@st.cache_resource
-def load_model():
-    return pipeline("text2text-generation", model="google/flan-t5-large")
-
-model = load_model()
-
 # --- BMI FUNCTIONS ---
 def calculate_bmi(weight, height_cm):
-    height_m = height_cm / 100
-    bmi = weight / (height_m ** 2)
-    return round(bmi, 2)
+    h = height_cm / 100
+    return round(weight / (h * h), 2)
 
 def bmi_category(bmi):
     if bmi < 18.5:
@@ -44,167 +34,172 @@ def generate_pdf(text):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer)
     styles = getSampleStyleSheet()
-    content = [Paragraph(line, styles["Normal"]) for line in text.split("\n")]
+    content = [Paragraph(p, styles["Normal"]) for p in text.split("\n\n")]
     doc.build(content)
     buffer.seek(0)
     return buffer
 
-# --- FIXED BASE PLAN (~500 WORDS) ---
-def get_base_plan():
-    return """
-DETAILED WORKOUT AND DIET PLAN
+# --- DYNAMIC PLAN GENERATOR ---
+def generate_plan(planner_name, age, gender, bmi, category, goal, diet_type, budget, equipment, calories):
 
-PROFILE OVERVIEW
-This plan is designed for a student aiming to improve overall health, maintain an ideal BMI, and achieve their fitness goals safely. It balances strength training, cardio, flexibility, and budget-friendly Indian nutrition. Suitable for beginners and intermediate learners.
+    equipment_text = ", ".join(equipment) if equipment else "bodyweight exercises only"
 
-WEEKLY WORKOUT PLAN
+    workout_focus = {
+        "Weight Loss": "fat burning, high repetitions, and cardiovascular exercises",
+        "Muscle Gain": "progressive overload strength training with proper recovery",
+        "Maintain Fitness": "balanced strength, flexibility, and endurance training"
+    }
+
+    diet_focus = {
+        "Weight Loss": "controlled calories with high fiber and protein",
+        "Muscle Gain": "protein-rich meals with complex carbohydrates",
+        "Maintain Fitness": "balanced nutrition with adequate vitamins and minerals"
+    }
+
+    plan = f"""
+<b>PERSONALIZED WORKOUT AND DIET PLAN</b>
+
+<b>Name:</b> {planner_name if planner_name else "AI Fitness Planner"}
+
+<b>PROFILE OVERVIEW</b>
+
+This fitness plan is designed for a {age}-year-old {gender.lower()} student with a BMI of {bmi} ({category}). 
+The primary fitness goal is {goal.lower()}, focusing on {workout_focus[goal]}. 
+The program is suitable for individuals using {equipment_text} and following a {diet_type.lower()} diet within a {budget.lower()} budget.
+The recommended daily calorie intake is around {calories} kcal for sustainable results.
+
+<b>WEEKLY WORKOUT PLAN</b>
 Monday – Full Body Strength:
-Push-ups 3x12, Squats 3x15, Plank 3x30s
+Push-ups 3×12, Squats 3×15, Plank 3×30 seconds.
 Tuesday – Cardio & Core:
-Jogging 30 min, Mountain Climbers 3x15, Leg Raises 3x12
+Jogging or brisk walking for 30 minutes, Mountain climbers 3×15, Leg raises 3×12.
 Wednesday – Upper Body:
-Dumbbell Curls 3x12, Shoulder Press 3x10, Triceps Dips 3x12
+Dumbbell curls 3×12, Shoulder press 3×10, Triceps dips 3×12.
 Thursday – Active Recovery:
-Yoga 30 min, Breathing exercises 10 min
+Yoga and stretching for 30 minutes with breathing exercises.
 Friday – Lower Body:
-Lunges 3x10 per leg, Squats 3x15, Calf Raises 3x20
+Lunges 3×10 per leg, Squats 3×15, Calf raises 3×20.
 Saturday – Cardio + Abs:
-Cycling/Skipping 25 min, Crunches 3x15, Plank 3x40s
-Sunday – Rest or Light Walking
+Skipping or cycling 25 minutes, Crunches 3×15, Plank 3×40 seconds.
+Sunday – Rest or light walking.
 
-DIET PLAN (INDIAN & BUDGET-FRIENDLY)
-Early Morning:
-Warm water with lemon, 5 soaked almonds
-Breakfast:
-Vegetable oats or 2 idlis with sambar, Boiled egg or Paneer
-Mid-Morning:
-One seasonal fruit
-Lunch:
-Brown rice/2 chapatis, Dal or Grilled chicken, Vegetable curry, Curd
-Evening Snack:
-Roasted peanuts or Sprouts chaat
-Dinner:
-2 chapatis with vegetable sabzi, Paneer bhurji or Egg curry
+<b>DIET PLAN (INDIAN & BUDGET FRIENDLY)</b>
+Diet strategy: {diet_focus[goal]}.
 
-HYDRATION & LIFESTYLE
-Drink 2.5–3 liters water daily
-Sleep 7–8 hours
-Avoid junk food & sugary drinks
-Track progress weekly
+<i>Early Morning:</i> Warm water with lemon and 5 soaked almonds.  
+<i>Breakfast:</i> Vegetable oats or idli with sambar and {"paneer or tofu" if diet_type=="Vegetarian" else "boiled eggs"}.  
+<i>Mid-Morning:</i> One seasonal fruit such as apple or banana.  
+<i>Lunch:</i> Brown rice or chapatis, dal or {"paneer curry" if diet_type=="Vegetarian" else "grilled chicken"}, mixed vegetable sabzi, curd.  
+<i>Evening Snack:</i> Sprouts chaat or roasted peanuts.  
+<i>Dinner:</i> Chapatis with vegetable curry and {"paneer bhurji" if diet_type=="Vegetarian" else "egg curry"}.
 
-FINAL ADVICE
-Consistency is the key. Follow this plan daily for sustainable results.
+<b>HYDRATION & LIFESTYLE</b>
+Drink at least 2.5–3 liters of water daily.
+Sleep 7–8 hours for recovery.
+Avoid junk food and sugary drinks.
+Maintain consistency and track progress weekly.
+
+<b>FINAL ADVICE</b>
+This plan is student-friendly, affordable, and safe. 
+Follow it consistently for 8–12 weeks to improve fitness, stamina, and overall health.
 """
 
-# --- USER INPUTS ---
-st.title("💪 Personalized Workout & Diet Planner with AI")
+    return plan.strip()
+
+# --- UI ---
+st.title("💪 Personalized Workout & Diet Planner")
 
 st.sidebar.header("👤 User Details")
+
+planner_name = st.sidebar.text_input(
+    "Name",
+    value="",
+    placeholder="Enter Your Name"
+)
+
 age = st.sidebar.number_input("Age", 10, 80, 21)
-gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Other"])
+gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
 height = st.sidebar.number_input("Height (cm)", 120, 220, 170)
 weight = st.sidebar.number_input("Weight (kg)", 30, 150, 65)
 goal = st.sidebar.selectbox("Fitness Goal", ["Weight Loss", "Muscle Gain", "Maintain Fitness"])
 diet_type = st.sidebar.selectbox("Diet Preference", ["Vegetarian", "Non-Vegetarian"])
 budget = st.sidebar.selectbox("Monthly Food Budget", ["Low", "Medium", "High"])
-equipment = st.sidebar.multiselect("Available Equipment", ["Bodyweight", "Dumbbells", "Resistance Bands", "Gym Access"])
+equipment = st.sidebar.multiselect(
+    "Available Equipment",
+    ["Bodyweight", "Dumbbells", "Resistance Bands", "Gym Access"]
+)
 
 # --- BMI DISPLAY ---
 bmi = calculate_bmi(weight, height)
 category = bmi_category(bmi)
 
 st.subheader("📊 BMI Analysis")
-st.metric("BMI Value", bmi)
+st.metric("BMI", bmi)
 st.info(f"BMI Category: **{category}**")
 
-# --- CALORIE ESTIMATION ---
-st.subheader("🔥 Weekly Calorie Requirement")
-calories_map = {"Weight Loss": 1800, "Maintain Fitness": 2200, "Muscle Gain": 2600}
+# --- CALORIES ---
+calories_map = {
+    "Weight Loss": 1800,
+    "Maintain Fitness": 2200,
+    "Muscle Gain": 2600
+}
 daily_calories = calories_map[goal]
-weekly_calories = daily_calories * 7
-st.write(f"**Daily Calories:** {daily_calories} kcal")
-st.write(f"**Weekly Calories:** {weekly_calories} kcal")
 
-# --- GENERATE AI + HYBRID PLAN ---
-if st.button("🧠 Generate AI Fitness Plan"):
-    with st.spinner("Generating personalized plan..."):
-        equip_text = ", ".join(equipment) if equipment else "No equipment"
-        base_plan = get_base_plan()
+st.subheader("🔥 Daily Calorie Recommendation")
+st.write(f"**{daily_calories} kcal/day**")
 
-        prompt = f"""
-You are a fitness expert. Take this base plan (~500 words) and customize it for a user:
+# --- GENERATE PLAN ---
+if st.button("🧠 Generate Workout & Diet Plan"):
+    plan = generate_plan(
+        planner_name, age, gender, bmi, category,
+        goal, diet_type, budget,
+        equipment, daily_calories
+    )
+    st.session_state["plan"] = plan
+    st.markdown(plan, unsafe_allow_html=True)
+    st.success("✅ Plan generated successfully!")
 
-User Details:
-Age: {age}
-Gender: {gender}
-Height: {height} cm
-Weight: {weight} kg
-BMI: {bmi} ({category})
-Goal: {goal}
-Diet Type: {diet_type}
-Budget: {budget}
-Equipment: {equip_text}
-Daily Calories: {daily_calories}
-
-Base Plan:
-{base_plan}
-
-Instructions:
-- Adjust workouts based on BMI and goal.
-- Include gender-specific considerations.
-- Suggest Indian meals based on budget and diet type.
-- Keep it simple for students with limited equipment.
-- Keep total length around 500 words.
-"""
-
-        result = model(prompt, max_length=1500, do_sample=False)[0]["generated_text"]
-        st.session_state["plan"] = result
-        st.success("✅ Personalized AI + Template Plan Generated")
-
-# --- DISPLAY PLAN + PDF ---
+# --- PDF DOWNLOAD ---
 if "plan" in st.session_state:
-    st.subheader("📋 Your Personalized AI Plan")
-    st.write(st.session_state["plan"])
-    
     pdf = generate_pdf(st.session_state["plan"])
     st.download_button(
-        label="📄 Download Plan as PDF",
+        "📄 Download as PDF",
         data=pdf,
-        file_name="AI_Fitness_Plan.pdf",
+        file_name="Workout_Diet_Plan.pdf",
         mime="application/pdf"
     )
 
 # --- EXERCISE DEMOS ---
 st.subheader("🏋️ Exercise Demonstrations")
+
+IMAGE_DIR = Path(__file__).parent / "Images"
 exercise_images = {
-    "Push-ups": Path(__file__).parent / "Images" / "pushup.jpg",
-    "Squats":  Path(__file__).parent / "Images" / "Squats.jpg",
-    "Plank":  Path(__file__).parent / "Images" / "Plank.jpg",
-    "Dumbbell Curls":  Path(__file__).parent / "Images" / "DumbbellCurls.jpg"
+    "Push-ups": IMAGE_DIR / "pushup.jpg",
+    "Squats": IMAGE_DIR / "Squats.jpg",
+    "Plank": IMAGE_DIR / "Plank.jpg",
+    "Dumbbell Curls": IMAGE_DIR / "DumbbellCurls.jpg"
 }
 
 cols = st.columns(4)
 for col, (name, img) in zip(cols, exercise_images.items()):
     if img.exists():
-        col.image(img, caption=name, use_container_width=True)
-    else:
-        col.write(f"Image not found: {name}")
+        col.image(str(img), caption=name, use_container_width=True)
 
 # --- PROGRESS TRACKING ---
 st.subheader("📈 Progress Tracking")
-progress_data = pd.DataFrame({
+
+progress = pd.DataFrame({
     "Week": ["Week 1", "Week 2", "Week 3", "Week 4"],
     "Weight (kg)": [weight, weight-0.5, weight-1, weight-1.5]
 })
 
 fig, ax = plt.subplots()
-ax.plot(progress_data["Week"], progress_data["Weight (kg)"], marker="o")
-ax.set_xlabel("Week")
-ax.set_ylabel("Weight (kg)")
-ax.set_title("Weight Progress")
+ax.plot(progress["Week"], progress["Weight (kg)"], marker="o")
+ax.set_xlabel("Week", color="blue")
+ax.set_ylabel("Weight (kg)", color="blue")
+ax.set_title("Expected Weight Progress", color="green")
 st.pyplot(fig)
 
 # --- FOOTER ---
 st.markdown("---")
-st.caption("Perfect for Students and Fitness Enthusiasts")
-st.caption("Follow daily tips strictly for best results")
+st.caption("Perfect for Students | Budget Friendly | Simple & Effective")
