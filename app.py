@@ -1,4 +1,4 @@
-# REQUIRED LIBRARIES
+# === REQUIRED LIBRARIES ===
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,15 +6,25 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from pathlib import Path
 import io
+from transformers import pipeline   # AI MODEL
 
-# --- CONFIG ---
+# === CONFIG ===
 st.set_page_config(
     page_title="AI Workout & Diet Planner",
     page_icon="💪",
     layout="wide"
 )
 
-# --- BMI FUNCTIONS ---
+# === LOAD AI MODEL ===
+@st.cache_resource
+def load_model():
+    return pipeline(
+        "text2text-generation", model="google/flan-t5-large"
+    )
+
+model = load_model()
+
+# === BMI FUNCTIONS ===
 def calculate_bmi(weight, height_cm):
     h = height_cm / 100
     return round(weight / (h * h), 2)
@@ -29,7 +39,7 @@ def bmi_category(bmi):
     else:
         return "Obese"
 
-# --- PDF FUNCTION ---
+# === PDF FUNCTION ===
 def generate_pdf(text):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer)
@@ -39,7 +49,7 @@ def generate_pdf(text):
     buffer.seek(0)
     return buffer
 
-# --- DYNAMIC PLAN GENERATOR ---
+# === PLAN GENERATOR ===
 def generate_plan(planner_name, age, gender, bmi, category, goal, diet_type, budget, equipment, calories):
 
     equipment_text = ", ".join(equipment) if equipment else "bodyweight exercises only"
@@ -60,6 +70,8 @@ def generate_plan(planner_name, age, gender, bmi, category, goal, diet_type, bud
 <b>PERSONALIZED WORKOUT AND DIET PLAN</b>
 
 <b>Name:</b> {planner_name if planner_name else "AI Fitness Planner"}
+
+<b>Fitness Goal:</b> {goal.title()}
 
 <b>PROFILE OVERVIEW</b>
 
@@ -103,11 +115,10 @@ Maintain consistency and track progress weekly.
 This plan is student-friendly, affordable, and safe. 
 Follow it consistently for 8–12 weeks to improve fitness, stamina, and overall health.
 """
-
     return plan.strip()
 
-# --- UI ---
-st.title("💪 Personalized Workout & Diet Planner")
+# === UI ===
+st.title("💪 Personalized Workout & Diet Planner with AI")
 
 st.sidebar.header("👤 User Details")
 
@@ -129,7 +140,7 @@ equipment = st.sidebar.multiselect(
     ["Bodyweight", "Dumbbells", "Resistance Bands", "Gym Access"]
 )
 
-# --- BMI DISPLAY ---
+# === BMI ===
 bmi = calculate_bmi(weight, height)
 category = bmi_category(bmi)
 
@@ -137,7 +148,7 @@ st.subheader("📊 BMI Analysis")
 st.metric("BMI", bmi)
 st.info(f"BMI Category: **{category}**")
 
-# --- CALORIES ---
+# === CALORIES ===
 calories_map = {
     "Weight Loss": 1800,
     "Maintain Fitness": 2200,
@@ -145,21 +156,20 @@ calories_map = {
 }
 daily_calories = calories_map[goal]
 
-st.subheader("🔥 Daily Calorie Recommendation")
+st.subheader("🔥 Daily Calories")
 st.write(f"**{daily_calories} kcal/day**")
 
-# --- GENERATE PLAN ---
+# === GENERATE PLAN ===
 if st.button("🧠 Generate Workout & Diet Plan"):
     plan = generate_plan(
         planner_name, age, gender, bmi, category,
-        goal, diet_type, budget,
-        equipment, daily_calories
+        goal, diet_type, budget, equipment, daily_calories
     )
     st.session_state["plan"] = plan
     st.markdown(plan, unsafe_allow_html=True)
     st.success("✅ Plan generated successfully!")
 
-# --- PDF DOWNLOAD ---
+# === PDF DOWNLOAD ===
 if "plan" in st.session_state:
     pdf = generate_pdf(st.session_state["plan"])
     st.download_button(
@@ -169,7 +179,7 @@ if "plan" in st.session_state:
         mime="application/pdf"
     )
 
-# --- EXERCISE DEMOS ---
+# === IMAGES ===
 st.subheader("🏋️ Exercise Demonstrations")
 
 IMAGE_DIR = Path(__file__).parent / "Images"
@@ -185,7 +195,7 @@ for col, (name, img) in zip(cols, exercise_images.items()):
     if img.exists():
         col.image(str(img), caption=name, use_container_width=True)
 
-# --- PROGRESS TRACKING ---
+# === PROGRESS ===
 st.subheader("📈 Progress Tracking")
 
 progress = pd.DataFrame({
@@ -197,9 +207,9 @@ fig, ax = plt.subplots()
 ax.plot(progress["Week"], progress["Weight (kg)"], marker="o")
 ax.set_xlabel("Week", color="blue")
 ax.set_ylabel("Weight (kg)", color="blue")
-ax.set_title("Expected Weight Progress", color="green")
+ax.set_title("Expected Weight Progress", color="Green")
 st.pyplot(fig)
 
-# --- FOOTER ---
+# === FOOTER ===
 st.markdown("---")
 st.caption("Perfect for Students | Budget Friendly | Simple & Effective")
